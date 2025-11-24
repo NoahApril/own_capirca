@@ -3,6 +3,12 @@
 [![BuildStatus](https://travis-ci.org/google/capirca.svg?branch=master)](https://travis-ci.org/google/capirca)
 <!-- <a href="https://github.com/google/capirca/actions/" target="_blank"><img src="https://github.com/google/capirca/workflows/build/badge.svg?branch=master"></a> -->
 
+> 📋 **New Analysis Reports Available:**
+> - [Forcepoint NGFW Extension Analysis](./Forcepoint_Extension_Analysis_Report.md) - Feasibility study for adding Forcepoint support
+> - [Forcepoint Summary](./FORCEPOINT_SUMMARY.md) - Executive summary and decision guide
+> - [Capirca Migration Analysis](./Capirca_Migration_Analysis_Report.md) - Confluence to Capirca migration guide
+> - [Technical Deep Dive](./Technical_Deep_Dive_Capirca.md) - Architecture and implementation details
+
 - [About](#about)
 - [The basics](#the-basics)
   - [Anatomy of a policy file](#anatomy-of-a-policy-file)
