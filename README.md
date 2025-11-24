@@ -5,7 +5,8 @@
 
 > 📋 **New Analysis Reports Available:**
 > - [Forcepoint NGFW Extension Analysis](./Forcepoint_Extension_Analysis_Report.md) - Feasibility study for adding Forcepoint support
-> - [Forcepoint Summary](./FORCEPOINT_SUMMARY.md) - Executive summary and decision guide
+> - [Forcepoint Summary](./FORCEPOINT_SUMMARY.md) - Executive summary and decision guide  
+> - [Forcepoint Documentation Summary](./FORCEPOINT_DOCUMENTATION_SUMMARY.md) - Complete implementation guide suite
 > - [Capirca Migration Analysis](./Capirca_Migration_Analysis_Report.md) - Confluence to Capirca migration guide
 > - [Technical Deep Dive](./Technical_Deep_Dive_Capirca.md) - Architecture and implementation details
 

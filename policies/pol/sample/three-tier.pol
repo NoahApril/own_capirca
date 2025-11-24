@@ -1,0 +1,79 @@
+header {
+  comment:: "Three-Tier Application Security Policy"
+  target:: forcepoint three-tier-app inet json
+}
+
+# Web to Application tier
+term web-to-app {
+  comment:: "Allow web servers to application servers"
+  source-address:: WEB_TIER
+  destination-address:: APP_TIER
+  destination-port:: APP_PORTS
+  protocol:: tcp
+  action:: accept
+  logging:: true
+  forcepoint-log-level:: essential
+}
+
+# Application to Database tier
+term app-to-db {
+  comment:: "Allow application servers to database servers"
+  source-address:: APP_TIER
+  destination-address:: DB_TIER
+  destination-port:: DB_PORTS
+  protocol:: tcp
+  action:: accept
+  logging:: true
+  forcepoint-log-level:: essential
+}
+
+# Application to Web tier (responses)
+term app-to-web {
+  comment:: "Allow application servers to web servers"
+  source-address:: APP_TIER
+  destination-address:: WEB_TIER
+  destination-port:: HTTP HTTPS
+  protocol:: tcp
+  action:: accept
+  logging:: true
+}
+
+# Database to Application tier (responses)
+term db-to-app {
+  comment:: "Allow database servers to application servers"
+  source-address:: DB_TIER
+  destination-address:: APP_TIER
+  destination-port:: DB_PORTS
+  protocol:: tcp
+  action:: accept
+  logging:: true
+}
+
+# Management access
+term mgmt-access {
+  comment:: "Allow management access from operations network"
+  source-address:: OPS_NETWORK
+  destination-address:: WEB_TIER APP_TIER DB_TIER
+  destination-port:: SSH HTTPS
+  protocol:: tcp
+  action:: accept
+  logging:: true
+  forcepoint-log-level:: essential
+}
+
+# Deny direct web to database access
+term deny-web-to-db {
+  comment:: "Deny direct web to database access"
+  source-address:: WEB_TIER
+  destination-address:: DB_TIER
+  action:: deny
+  logging:: true
+  forcepoint-log-level:: alert
+}
+
+# Default deny
+term deny-all {
+  comment:: "Default deny all other traffic"
+  action:: deny
+  logging:: true
+}
