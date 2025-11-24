@@ -1,0 +1,75 @@
+# Service Definitions for Forcepoint Sample Policies
+
+# Web Services
+HTTP = 80/tcp
+HTTPS = 443/tcp
+WEB_PORTS = 80-443/tcp
+
+# Application Services
+APP_PORTS = 8080-8090/tcp
+API_MGMT_PORTS = 8443/tcp
+
+# Database Services
+MYSQL_POSTGRES = 3306/tcp
+DB_PORTS = 3306-3307/tcp
+DB_MGMT_PORTS = 3306-3307/tcp
+
+# Management Services
+SSH = 22/tcp
+RDP = 3389/tcp
+TELNET = 23/tcp
+
+# File Services
+SMB = 445/tcp
+FTP = 21/tcp
+SFTP = 22/tcp
+NFS = 2049/tcp
+
+# Email Services
+SMTP = 25/tcp
+IMAPS = 993/tcp
+POP3S = 995/tcp
+
+# DNS Services
+DNS = 53/udp
+
+# DHCP Services
+DHCP_SERVER = 67/udp
+DHCP_CLIENT = 68/udp
+
+# Monitoring Services
+MONITORING_PORTS = 161-162/udp
+SYSLOG = 514/udp
+SNMP = 161/udp
+
+# Backup Services
+BACKUP_PORTS = 22/tcp
+
+# Medical/Healthcare Services
+EMR_PORTS = 443/tcp
+DICOM_PORTS = 11112/tcp
+
+# Payment Services
+PAYMENT_PORTS = 443/tcp
+
+# Security Services
+REMEDIATION_PORTS = 22/tcp
+
+# Database Ports
+DATABASE_PORTS = 3306-3307/tcp
+
+# Cloud Services
+AWS_PORTS = 443/tcp
+
+# VPN Services
+VPN_PORTS = 443/tcp
+IPSEC = 500/udp
+IKE = 500/udp
+
+# Common Service Groups
+TCP_SERVICES = 22/tcp,23/tcp,25/tcp,53/tcp,80/tcp,110/tcp,143/tcp,443/tcp,993/tcp,995/tcp
+UDP_SERVICES = 53/udp,67/udp,68/udp,123/udp,161/udp,162/udp,500/udp
+
+# ICMP Services
+ICMP = icmp
+PING = icmp

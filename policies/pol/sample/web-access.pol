@@ -1,0 +1,40 @@
+header {
+  comment:: "Basic Web Access Policy - Allow HTTP/HTTPS to DMZ web servers"
+  target:: forcepoint web-access inet json
+}
+
+term allow-http {
+  comment:: "Allow HTTP traffic from internal users to web servers"
+  source-address:: INTERNAL_USERS
+  destination-address:: DMZ_WEBSERVERS
+  destination-port:: HTTP
+  protocol:: tcp
+  action:: accept
+  logging:: true
+}
+
+term allow-https {
+  comment:: "Allow HTTPS traffic from internal users to web servers"
+  source-address:: INTERNAL_USERS
+  destination-address:: DMZ_WEBSERVERS
+  destination-port:: HTTPS
+  protocol:: tcp
+  action:: accept
+  logging:: true
+}
+
+term deny-other-web {
+  comment:: "Deny other web traffic to web servers"
+  source-address:: INTERNAL_USERS
+  destination-address:: DMZ_WEBSERVERS
+  destination-port:: WEB_PORTS
+  protocol:: tcp
+  action:: deny
+  logging:: true
+}
+
+term deny-all {
+  comment:: "Default deny all other traffic"
+  action:: deny
+  logging:: true
+}

@@ -20,6 +20,25 @@ This repository contains comprehensive analysis documents for Capirca and potent
   - Code examples & API details
   - Risk assessment
 
+### For Implementation & Operations
+- **[doc/generators/forcepoint.md](./doc/generators/forcepoint.md)** ⭐ GENERATOR DOCUMENTATION
+  - Complete Forcepoint generator reference
+  - Output formats (JSON/SDK/XML)
+  - Action mappings and extensions
+  - Deployment methods
+
+- **[doc/forcepoint-restapi-howto.md](./doc/forcepoint-restapi-howto.md)** ⭐ API INTEGRATION GUIDE
+  - REST API authentication & usage
+  - Policy and object management
+  - Advanced use cases & automation
+  - Error handling & best practices
+
+- **[doc/forcepoint-examples-usecases.md](./doc/forcepoint-examples-usecases.md)** ⭐ PRACTICAL EXAMPLES
+  - Real-world policy examples
+  - Network segmentation scenarios
+  - Compliance templates (PCI DSS, HIPAA)
+  - Automation scripts & tools
+
 ### For Architecture / Planning
 - **[Technical_Deep_Dive_Capirca.md](./Technical_Deep_Dive_Capirca.md)**
   - Capirca architecture overview
@@ -42,6 +61,9 @@ This repository contains comprehensive analysis documents for Capirca and potent
 |----------|---------|----------|------|--------|
 | **FORCEPOINT_SUMMARY.md** | Quick decision guide for Forcepoint extension | Executives, Managers | 7.4 KB | ✅ Complete |
 | **Forcepoint_Extension_Analysis_Report.md** | Comprehensive technical analysis | Developers, Architects | 29 KB | ✅ Complete |
+| **doc/generators/forcepoint.md** | Forcepoint generator documentation | Engineers, Operators | 12 KB | ✅ Complete |
+| **doc/forcepoint-restapi-howto.md** | REST API integration guide | DevOps, Engineers | 25 KB | ✅ Complete |
+| **doc/forcepoint-examples-usecases.md** | Practical examples & use cases | Security Teams | 30 KB | ✅ Complete |
 | **Technical_Deep_Dive_Capirca.md** | Capirca architecture & patterns | Architects, Developers | 8.2 KB | ✅ Complete |
 | **Capirca_Migration_Analysis_Report.md** | Migration & GUI implementation | Project Managers, Developers | 7.5 KB | ✅ Complete |
 | **README.md** | Main Capirca documentation | All users | 32 KB | ✅ Updated |
