@@ -35,7 +35,7 @@ setuptools.setup(
     url='https://github.com/google/capirca/',
     maintainer='Capirca Team',
     maintainer_email='capirca-dev@google.com',
-    packages=['capirca', 'capirca.lib', 'capirca.utils'],
+    packages=['capirca', 'capirca.lib', 'capirca.utils', 'capirca.db', 'capirca.api', 'capirca.api.routers', 'capirca.api.services', 'capirca.api.models'],
     zip_safe=False,
     entry_points={
         'console_scripts': ['aclgen = capirca.aclgen:EntryPoint'],
@@ -55,6 +55,13 @@ setuptools.setup(
         'mock',
         'six',
         'PyYAML',
+        'fastapi>=0.100.0',
+        'uvicorn[standard]>=0.23.0',
+        'pydantic>=2.0',
+        'pydantic-settings>=2.0',
+        'SQLAlchemy>=2.0',
+        'alembic>=1.11.0',
+        'requests>=2.31.0',
     ],
     python_requires='>=3.6',
 )

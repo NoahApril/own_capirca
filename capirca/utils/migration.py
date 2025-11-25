@@ -28,9 +28,10 @@ Classes:
 import hashlib
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from html.parser import HTMLParser
 
+import requests
 from absl import logging
 
 
@@ -44,6 +45,10 @@ class ParseError(Error):
 
 class ValidationError(Error):
   """Error validating rule data."""
+
+
+class MigrationAPIError(Error):
+  """Error when communicating with the Phase 2 API."""
 
 
 @dataclass
@@ -565,3 +570,115 @@ class CapircaGenerator:
       lines.append('')
     
     return '\n'.join(lines)
+
+
+class MigrationAPIClient:
+  """Client helper for persisting migration outputs via the Phase 2 API."""
+
+  def __init__(self, base_url: str, api_key: Optional[str] = None,
+               session: Optional[requests.Session] = None,
+               timeout: int = 30):
+    """Initialize the API client.
+
+    Args:
+      base_url: Base URL of the Capirca API (e.g. http://localhost:8000/api).
+      api_key: Optional bearer token for authentication.
+      session: Optional custom requests session for testing.
+      timeout: Request timeout in seconds.
+    """
+    self.base_url = base_url.rstrip('/')
+    self.session = session or requests.Session()
+    self.timeout = timeout
+    self.headers = {'Content-Type': 'application/json'}
+    if api_key:
+      self.headers['Authorization'] = f'Bearer {api_key}'
+
+  def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    url = f"{self.base_url}{path}"
+    response = self.session.post(
+        url, json=payload, headers=self.headers, timeout=self.timeout)
+    if response.status_code >= 400:
+      raise MigrationAPIError(
+          f"API request {url} failed with status {response.status_code}: "
+          f"{response.text}")
+    return response.json()
+
+  def persist_network_object(self, name: str, addresses: List[str],
+                             description: Optional[str] = None
+                            ) -> Dict[str, Any]:
+    payload = {
+        'name': name,
+        'addresses': addresses,
+        'description': description,
+    }
+    return self._post('/network-objects', payload)
+
+  def persist_service_object(self, service: ServiceDef) -> Dict[str, Any]:
+    payload = {
+        'name': service.name,
+        'ports': service.ports,
+        'protocols': service.protocols,
+        'description': service.description,
+    }
+    return self._post('/service-objects', payload)
+
+  def persist_policy(self, name: str, content: str,
+                     description: Optional[str] = None,
+                     status: str = 'draft') -> Dict[str, Any]:
+    payload = {
+        'name': name,
+        'description': description,
+        'content': content,
+        'status': status,
+    }
+    return self._post('/policies', payload)
+
+  def validate_policy(self, policy_id: int) -> Dict[str, Any]:
+    return self._post(f'/policies/{policy_id}/validate', {})
+
+  def persist_migration_output(
+      self,
+      policy_content: str,
+      policy_name: str,
+      network_objects: Optional[Dict[str, List[str]]] = None,
+      service_objects: Optional[Dict[str, ServiceDef]] = None,
+      description: Optional[str] = None,
+      status: str = 'draft',
+      validate: bool = True) -> Dict[str, Any]:
+    """Persist migration artifacts to the Phase 2 API.
+
+    Args:
+      policy_content: Rendered Capirca policy text.
+      policy_name: Name to use for the policy inside the API.
+      network_objects: Extracted network objects keyed by name.
+      service_objects: Extracted service objects keyed by name.
+      description: Optional policy description.
+      status: Policy status (default: draft).
+      validate: Whether to immediately trigger validation after persistence.
+
+    Returns:
+      Dictionary containing persisted objects and validation response.
+    """
+    persisted_networks = []
+    persisted_services = []
+
+    for name, addresses in (network_objects or {}).items():
+      persisted_networks.append(
+          self.persist_network_object(name, addresses))
+
+    for service in (service_objects or {}).values():
+      persisted_services.append(self.persist_service_object(service))
+
+    policy = self.persist_policy(policy_name, policy_content,
+                                 description=description, status=status)
+
+    validation = None
+    if validate:
+      validation = self.validate_policy(policy['id'])
+
+    return {
+        'policy': policy,
+        'validation': validation,
+        'network_objects': persisted_networks,
+        'service_objects': persisted_services,
+    }

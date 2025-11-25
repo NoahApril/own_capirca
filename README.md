@@ -11,6 +11,7 @@
 > - [Technical Deep Dive](./Technical_Deep_Dive_Capirca.md) - Architecture and implementation details
 
 - [About](#about)
+- [Phase 2 API & Validation Engine](#phase-2-api--validation-engine)
 - [The basics](#the-basics)
   - [Anatomy of a policy file](#anatomy-of-a-policy-file)
       - [Headers](#headers)
@@ -40,7 +41,7 @@ high-level policy files to facilitate the development and manipulation of
 network access control lists (ACLs) for various platforms. It was developed by
 Google for internal use, and is now open source.
 
-Capirca consist of `capirca` Python package and the `capirca` tool.
+Capirca consist of `capirca` Python package, the `capirca` tool, and the new Phase 2 REST API.
 
 The typical usage workflow consists of the following steps:
 
@@ -51,6 +52,55 @@ The typical usage workflow consists of the following steps:
 1.  Generate ACL configurations by running `capirca` command referencing the
     access control policy and the object definitions. The command triggers a
     **generator** for each of the firewall platforms.
+
+## Phase 2 API & Validation Engine
+
+Phase 2 adds a persistent data model, FastAPI REST service, and a multi-layer
+validation engine that extends the migration tooling. Highlights include:
+
+- SQLAlchemy ORM (`capirca/db/models.py`) with policies, network objects, service
+  objects, deployments, and validation result tables.
+- FastAPI application (`capirca/api/main.py`) with routers for policies,
+  network/service objects, deployments, and validation endpoints.
+- `PolicyValidator` service providing syntax, reference, and security checks.
+- `MigrationAPIClient` helper (`capirca/utils/migration.py`) that lets the Phase 1
+  migration engine persist artifacts via the new API.
+- Comprehensive documentation in `PHASE2_IMPLEMENTATION.md` and new tests under
+  `tests/api/` and `tests/utils/migration_api_client_test.py`.
+
+### Quickstart
+
+```bash
+pip install -r requirements.txt
+python -m capirca.db.init_db
+python -m uvicorn capirca.api.main:app --reload
+```
+
+The API will be available at `http://localhost:8000` (interactive docs at
+`/docs`).
+
+### Sample API Usage
+
+```python
+from capirca.utils.migration import MigrationAPIClient, ServiceDef
+
+client = MigrationAPIClient('http://localhost:8000/api')
+
+network_objects = {
+    'INTERNAL_NETS': ['10.0.0.0/8', '192.168.0.0/16']
+}
+service_objects = {
+    'SVC_TCP_443': ServiceDef(name='SVC_TCP_443', ports=['443'], protocols=['tcp'])
+}
+
+result = client.persist_migration_output(
+    policy_content='header { target:: juniper TEST } term allow-any { action:: accept }',
+    policy_name='migration-demo',
+    network_objects=network_objects,
+    service_objects=service_objects,
+)
+print(result['policy']['id'], result['validation'])
+```
 
 ## The basics
 
