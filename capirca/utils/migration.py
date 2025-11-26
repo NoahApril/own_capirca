@@ -86,6 +86,238 @@ class FirewallRule:
   options: List[str] = field(default_factory=list)
 
 
+@dataclass
+class Host:
+  """Host definition."""
+  fqdn: str
+  ip_address: str
+  function: Optional[str] = None
+  comment: Optional[str] = None
+
+
+@dataclass
+class Network:
+  """Network definition."""
+  name: str
+  cidr: str
+  function: Optional[str] = None
+  comment: Optional[str] = None
+
+
+@dataclass
+class Group:
+  """Group definition."""
+  name: str
+  members: List[str]
+  function: Optional[str] = None
+  comment: Optional[str] = None
+
+
+@dataclass
+class DependencyReport:
+  """Report of dependency analysis.
+  
+  Attributes:
+    definitions: Mapping of defined names to their types (host/network/group)
+    references: Set of all referenced names
+    unresolved: References without definitions
+    dependency_chains: Mapping of names to their dependency chains
+    cycles: Detected dependency cycles
+    max_depth: Length of the longest dependency chain
+  """
+  definitions: Dict[str, str] = field(default_factory=dict)
+  references: Set[str] = field(default_factory=set)
+  unresolved: Set[str] = field(default_factory=set)
+  dependency_chains: Dict[str, List[str]] = field(default_factory=dict)
+  cycles: List[List[str]] = field(default_factory=list)
+  max_depth: int = 0
+  
+  def format_report(self) -> str:
+    """Format report as human-readable string."""
+    lines = []
+    lines.append("Dependency Analysis Report")
+    lines.append("="*50)
+    lines.append("")
+    
+    lines.append(f"Definitions ({len(self.definitions)}):")
+    for name, def_type in sorted(self.definitions.items()):
+      lines.append(f"  - {name} ({def_type})")
+    lines.append("")
+    
+    lines.append(f"References ({len(self.references)}):")
+    for ref in sorted(self.references):
+      status = "UNRESOLVED" if ref in self.unresolved else "OK"
+      lines.append(f"  - {ref} [{status}]")
+    lines.append("")
+    
+    if self.unresolved:
+      lines.append(f"Unresolved ({len(self.unresolved)}):")
+      for ref in sorted(self.unresolved):
+        lines.append(f"  - {ref}")
+      lines.append("")
+    
+    if self.dependency_chains:
+      lines.append("Dependency Chains:")
+      for name, chain in sorted(self.dependency_chains.items()):
+        chain_str = " → ".join(chain)
+        lines.append(f"  - {name}: {chain_str}")
+      lines.append("")
+    
+    if self.cycles:
+      lines.append(f"Cycles Detected ({len(self.cycles)}):")
+      for cycle in self.cycles:
+        cycle_str = " → ".join(cycle + [cycle[0]])
+        lines.append(f"  - {cycle_str}")
+      lines.append("")
+    else:
+      lines.append("Cycles: None")
+      lines.append("")
+    
+    lines.append(f"Max Dependency Depth: {self.max_depth}")
+    
+    return "\n".join(lines)
+
+
+class DependencyAnalyzer:
+  """Analyze dependencies in parsed firewall data.
+  
+  This class analyzes ConfluenceParser state to identify:
+  - All defined objects (hosts, networks, groups)
+  - All referenced names
+  - Unresolved references (missing definitions)
+  - Dependency chains and depth
+  - Circular dependencies
+  """
+  
+  def analyze(self, parser: 'ConfluenceParser') -> DependencyReport:
+    """Analyze dependencies in parser state.
+    
+    Args:
+      parser: ConfluenceParser instance with parsed data
+      
+    Returns:
+      DependencyReport with complete analysis
+    """
+    report = DependencyReport()
+    
+    # Collect definitions
+    for fqdn in parser.hosts:
+      report.definitions[fqdn] = 'host'
+    for name in parser.networks:
+      report.definitions[name] = 'network'
+    for name in parser.groups:
+      report.definitions[name] = 'group'
+    
+    # Collect references from groups
+    for group_name, members in parser.groups.items():
+      for member in members:
+        # Skip if it's an IP/CIDR
+        if not parser._is_ip_or_cidr(member):
+          report.references.add(member)
+    
+    # Find unresolved references
+    report.unresolved = report.references - set(report.definitions.keys())
+    
+    # Build dependency chains
+    for name in report.definitions:
+      chain = self._build_dependency_chain(name, parser, set())
+      if len(chain) > 1:
+        report.dependency_chains[name] = chain
+        report.max_depth = max(report.max_depth, len(chain) - 1)
+    
+    # Detect cycles
+    report.cycles = self._detect_cycles(parser)
+    
+    return report
+  
+  def _build_dependency_chain(self, name: str, parser: 'ConfluenceParser', 
+                               visited: Set[str]) -> List[str]:
+    """Build dependency chain for a name.
+    
+    Args:
+      name: Name to analyze
+      parser: Parser instance
+      visited: Set of already visited names (for cycle detection)
+      
+    Returns:
+      List representing dependency chain [name, dep1, dep2, ...]
+    """
+    chain = [name]
+    
+    if name in visited:
+      return chain
+    
+    visited.add(name)
+    
+    # Groups have dependencies on their members
+    if name in parser.groups:
+      members = parser.groups[name]
+      dependencies = []
+      for member in members:
+        # Skip IPs/CIDRs
+        if not parser._is_ip_or_cidr(member):
+          dependencies.append(member)
+          # Recursively get dependencies
+          sub_chain = self._build_dependency_chain(member, parser, visited.copy())
+          # Add all sub-dependencies
+          for item in sub_chain[1:]:
+            if item not in dependencies:
+              dependencies.append(item)
+      
+      chain.extend(dependencies)
+    
+    return chain
+  
+  def _detect_cycles(self, parser: 'ConfluenceParser') -> List[List[str]]:
+    """Detect cycles in group dependencies.
+    
+    Args:
+      parser: Parser instance
+      
+    Returns:
+      List of cycles, each cycle is a list of names
+    """
+    cycles = []
+    visited = set()
+    rec_stack = set()
+    
+    def dfs(node: str, path: List[str]) -> bool:
+      """DFS to detect cycles."""
+      visited.add(node)
+      rec_stack.add(node)
+      path.append(node)
+      
+      # Check group members
+      if node in parser.groups:
+        for member in parser.groups[node]:
+          # Skip IPs/CIDRs and unresolved references
+          if parser._is_ip_or_cidr(member):
+            continue
+          if member not in parser.hosts and member not in parser.networks and member not in parser.groups:
+            continue
+            
+          if member not in visited:
+            if dfs(member, path):
+              return True
+          elif member in rec_stack:
+            # Found cycle
+            cycle_start = path.index(member)
+            cycle = path[cycle_start:]
+            cycles.append(cycle)
+            return True
+      
+      path.pop()
+      rec_stack.remove(node)
+      return False
+    
+    # Check all groups
+    for group_name in parser.groups:
+      if group_name not in visited:
+        dfs(group_name, [])
+    
+    return cycles
+
+
 class ConfluenceHTMLParser(HTMLParser):
   """HTML parser for extracting table data from Confluence."""
   
@@ -140,115 +372,339 @@ class ConfluenceHTMLParser(HTMLParser):
 class ConfluenceParser:
   """Parse Confluence HTML table to structured firewall rules.
   
-  Supports parsing Confluence tables with columns:
-  - Rule/Name: Rule identifier
-  - Source: Source addresses
-  - Destination: Destination addresses
-  - Port/Ports: Destination ports
-  - Protocol: Network protocols
-  - Action: Rule action (Allow/Deny/etc.)
-  - Description/Comment: Rule description
+  Supports parsing Confluence tables for:
+  - Hosts: FQDN, IP-Adresse, Funktion, Kommentar
+  - Networks: Name, IP-Adresse (CIDR), Funktion, Kommentar
+  - Groups: Name, Mitglieder (FQDN), Funktion, Kommentar
+  - Rules: Nummer, Quelle, Ziel, Ports/Protokolle, Sub-Rule/Firewall, Kommentar
   """
   
   HEADER_MAPPINGS = {
-    'rule': 'name',
-    'regel': 'name',
+    # Common
     'name': 'name',
-    'source': 'source',
+    'funktion': 'function',
+    'kommentar': 'comment',
+    'comment': 'comment',
+    'description': 'comment',
+    
+    # Hosts
+    'fqdn': 'fqdn',
+    'ip-adresse': 'ip_address',
+    'ip': 'ip_address',
+    
+    # Networks
+    'ip-adresse (cidr)': 'cidr',
+    'cidr': 'cidr',
+    
+    # Groups
+    'mitglieder (fqdn)': 'members',
+    'mitglieder': 'members',
+    'members': 'members',
+    
+    # Rules
+    'nummer': 'name',
+    'rule': 'name',
     'quelle': 'source',
+    'source': 'source',
     'src': 'source',
-    'destination': 'destination',
     'ziel': 'destination',
+    'destination': 'destination',
     'dest': 'destination',
     'dst': 'destination',
-    'port': 'port',
+    'ports/protokolle': 'ports_protocols',
     'ports': 'port',
+    'port': 'port',
     'protocol': 'protocol',
     'proto': 'protocol',
     'action': 'action',
-    'description': 'description',
-    'comment': 'description',
-    'beschreibung': 'description',
+    'sub-rule/firewall': 'sub_rule',
+    'beschreibung': 'comment',
   }
-  
-  def parse_table(self, html_content: str) -> List[FirewallRule]:
-    """Parse Confluence HTML table to structured rules.
+
+  def __init__(self):
+    self.hosts: Dict[str, str] = {}  # FQDN -> IP
+    self.networks: Dict[str, str] = {}  # Name -> CIDR
+    self.groups: Dict[str, List[str]] = {}  # Name -> List[Member]
+    
+  def parse_html(self, html_content: str) -> List[FirewallRule]:
+    """Parse HTML content containing multiple tables.
     
     Args:
-      html_content: HTML content containing Confluence table
+      html_content: HTML content
       
     Returns:
-      List of FirewallRule objects
-      
-    Raises:
-      ParseError: If table structure is invalid
+      List of resolved FirewallRule objects
     """
+    # Split content by tables or parse sequentially
+    # We use a simple approach: find all tables and parse them
+    # Since ConfluenceHTMLParser parses one table at a time or we need to feed it chunks.
+    # Actually ConfluenceHTMLParser as implemented accumulates all rows.
+    # We need to handle multiple tables.
+    
+    # Let's split by <table> tags roughly or improve ConfluenceHTMLParser to handle multiple tables.
+    # The current ConfluenceHTMLParser seems to reset on <table> start but accumulates rows in self.rows.
+    # If we feed it multiple tables, it might merge them or we need to handle it.
+    # Let's check ConfluenceHTMLParser implementation.
+    # It sets in_table=True on <table> and False on </table>.
+    # It appends to self.rows.
+    # If we feed multiple tables, self.rows will contain all rows from all tables.
+    # But we lose the boundary between tables unless we check headers.
+    # A better approach is to split the HTML by <table> tags.
+    
+    tables = re.findall(r'<table.*?>(.*?)</table>', html_content, re.DOTALL | re.IGNORECASE)
+    
+    rules = []
+    
+    for table_html in tables:
+      # Wrap in table tags for the parser
+      full_table_html = f"<table>{table_html}</table>"
+      self._parse_single_table(full_table_html)
+      
+    # After parsing all tables (populating hosts, networks, groups),
+    # we might have parsed rules as well.
+    # But wait, _parse_single_table should return rules if it's a rule table.
+    # So we need to collect them.
+    
+    # Reset state for re-parsing if needed? No, we want to accumulate state.
+    
+    # Let's refine the loop.
+    for table_html in tables:
+      full_table_html = f"<table>{table_html}</table>"
+      table_rules = self._parse_single_table(full_table_html)
+      if table_rules:
+        rules.extend(table_rules)
+        
+    return rules
+
+  def _parse_single_table(self, html_content: str) -> List[FirewallRule]:
+    """Parse a single table and update state or return rules."""
     parser = ConfluenceHTMLParser()
     parser.feed(html_content)
     
-    if not parser.headers:
-      raise ParseError("No table headers found in HTML content")
-    
-    if not parser.rows:
-      logging.warning("No data rows found in table")
+    if not parser.headers or not parser.rows:
       return []
-    
+      
     header_map = self._map_headers(parser.headers)
-    rules = []
+    table_type = self._detect_table_type(header_map)
     
-    for row_idx, row in enumerate(parser.rows):
-      try:
-        rule = self._parse_row(row, header_map)
-        if rule:
-          rules.append(rule)
-      except Exception as e:
-        logging.warning(f"Failed to parse row {row_idx + 1}: {e}")
-        
-    return rules
-  
+    if table_type == 'host':
+      self._parse_host_table(parser.rows, header_map)
+    elif table_type == 'network':
+      self._parse_network_table(parser.rows, header_map)
+    elif table_type == 'group':
+      self._parse_group_table(parser.rows, header_map)
+    elif table_type == 'rule':
+      return self._parse_rule_table(parser.rows, header_map)
+    else:
+      logging.warning(f"Unknown table type with headers: {parser.headers}")
+      
+    return []
+
+  def _detect_table_type(self, header_map: Dict[int, str]) -> str:
+    """Detect table type based on mapped headers."""
+    values = set(header_map.values())
+    
+    if 'fqdn' in values and 'ip_address' in values:
+      return 'host'
+    if 'cidr' in values:
+      return 'network'
+    if 'members' in values:
+      return 'group'
+    if 'source' in values and 'destination' in values:
+      return 'rule'
+      
+    return 'unknown'
+
   def _map_headers(self, headers: List[str]) -> Dict[int, str]:
     """Map table column indices to field names."""
     header_map = {}
     for idx, header in enumerate(headers):
       normalized = header.lower().strip()
+      # Handle 'IP-Adresse (CIDR)' special case if needed, but mapping handles it
       field_name = self.HEADER_MAPPINGS.get(normalized)
+      if not field_name:
+        # Try partial match for complex headers
+        for key, val in self.HEADER_MAPPINGS.items():
+          if key in normalized:
+            field_name = val
+            break
+      
       if field_name:
         header_map[idx] = field_name
     return header_map
-  
-  def _parse_row(self, row: List[str], header_map: Dict[int, str]) -> Optional[FirewallRule]:
-    """Parse a single table row into a FirewallRule."""
-    if not any(cell.strip() for cell in row):
-      return None
+
+  def _parse_host_table(self, rows: List[List[str]], header_map: Dict[int, str]):
+    for row in rows:
+      data = self._extract_row_data(row, header_map)
+      # Skip if essential fields are missing or empty
+      if 'fqdn' in data and 'ip_address' in data:
+        fqdn = data['fqdn'].strip()
+        ip = data['ip_address'].strip()
+        # Skip if both FQDN and IP are empty
+        if fqdn and ip:
+          self.hosts[fqdn] = ip
+
+  def _parse_network_table(self, rows: List[List[str]], header_map: Dict[int, str]):
+    for row in rows:
+      data = self._extract_row_data(row, header_map)
+      # Skip if essential fields are missing or empty
+      if 'name' in data and 'cidr' in data:
+        name = data['name'].strip()
+        cidr = data['cidr'].strip()
+        # Skip if CIDR is empty (name can be optional in some cases)
+        if cidr:
+          self.networks[name] = cidr
+
+  def _parse_group_table(self, rows: List[List[str]], header_map: Dict[int, str]):
+    for row in rows:
+      data = self._extract_row_data(row, header_map)
+      # Skip if essential fields are missing or empty
+      if 'name' in data and 'members' in data:
+        name = data['name'].strip()
+        members_str = data['members'].strip()
+        # Skip if members field is empty
+        if name and members_str:
+          members = [m.strip() for m in re.split(r'[,;\s]+', members_str) if m.strip()]
+          # Only add if there are actual members after splitting
+          if members:
+            self.groups[name] = members
+
+  def _parse_rule_table(self, rows: List[List[str]], header_map: Dict[int, str]) -> List[FirewallRule]:
+    rules = []
+    for row in rows:
+      data = self._extract_row_data(row, header_map)
+      if not data:
+        continue
+        
+      # Generate name if missing
+      if 'name' not in data:
+        row_signature = ''.join(row).encode('utf-8')
+        digest = hashlib.sha256(row_signature).hexdigest()[:8]
+        data['name'] = f"rule-{digest}"
       
+      rule = FirewallRule(name=self._normalize_name(data['name']))
+      
+      # Resolve Source
+      if 'source' in data:
+        rule.source_addresses = self._resolve_addresses(data['source'])
+      if 'action' in data:
+        rule.action = self._parse_action(data['action'])
+      # Resolve Destination
+      if 'destination' in data:
+        rule.destination_addresses = self._resolve_addresses(data['destination'])
+        
+      # Parse Ports/Protocols
+      ports = []
+      protocols = []
+      
+      if 'ports_protocols' in data:
+        pp_ports, pp_protos = self._parse_complex_ports(data['ports_protocols'])
+        ports.extend(pp_ports)
+        protocols.extend(pp_protos)
+        
+      if 'port' in data:
+        # Legacy port column
+        p_ports = self._parse_ports(data['port'])
+        ports.extend(p_ports)
+        
+      if 'protocol' in data:
+        # Legacy protocol column
+        p_protos = self._parse_protocols(data['protocol'])
+        protocols.extend(p_protos)
+        
+      rule.destination_ports = sorted(list(set(ports)))
+      rule.protocols = sorted(list(set(protocols)))
+        
+      if 'comment' in data:
+        rule.comment = data['comment']
+        
+      rules.append(rule)
+    return rules
+
+  def _extract_row_data(self, row: List[str], header_map: Dict[int, str]) -> Dict[str, str]:
     data = {}
     for idx, value in enumerate(row):
       field_name = header_map.get(idx)
       if field_name:
         data[field_name] = value.strip()
+    return data
+
+  def _resolve_addresses(self, source_str: str) -> List[str]:
+    """Resolve address string (IPs, names, groups) to list of IPs/CIDRs."""
+    items = [x.strip() for x in re.split(r'[,;\s]+', source_str) if x.strip()]
+    resolved = []
     
-    if not data.get('name'):
-      row_signature = ''.join(row).encode('utf-8')
-      digest = hashlib.sha256(row_signature).hexdigest()[:8]
-      data['name'] = f"rule-{digest}"
-    
-    rule = FirewallRule(name=self._normalize_name(data.get('name', 'unnamed')))
-    
-    if 'source' in data:
-      rule.source_addresses = self._parse_addresses(data['source'])
-    if 'destination' in data:
-      rule.destination_addresses = self._parse_addresses(data['destination'])
-    if 'port' in data:
-      rule.destination_ports = self._parse_ports(data['port'])
-    if 'protocol' in data:
-      rule.protocols = self._parse_protocols(data['protocol'])
-    if 'action' in data:
-      rule.action = self._parse_action(data['action'])
-    if 'description' in data:
-      rule.comment = data['description']
+    for item in items:
+      resolved.extend(self._resolve_single_item(item))
       
-    return rule
-  
+    return sorted(list(set(resolved)))
+
+  def _resolve_single_item(self, item: str, visited: Optional[Set[str]] = None) -> List[str]:
+    """Recursively resolve a single item."""
+    if visited is None:
+      visited = set()
+      
+    if item in visited:
+      logging.warning(f"Circular dependency detected for {item}")
+      return []
+      
+    visited.add(item)
+    
+    # Check if it's an IP or CIDR
+    if self._is_ip_or_cidr(item):
+      return [item]
+      
+    # Check Hosts
+    if item in self.hosts:
+      return [self.hosts[item]]
+      
+    # Check Networks
+    if item in self.networks:
+      return [self.networks[item]]
+      
+    # Check Groups
+    if item in self.groups:
+      members = self.groups[item]
+      result = []
+      for member in members:
+        result.extend(self._resolve_single_item(member, visited.copy()))
+      return result
+      
+    # Unknown, return as is (maybe Capirca will handle it or it's an error)
+    # For now, we return it as is, assuming it might be a valid object name in Capirca
+    # or a "Well-Known-Name" that we don't have definition for.
+    logging.info(f"Unresolved reference: {item}")
+    return [item]
+
+  def _is_ip_or_cidr(self, item: str) -> bool:
+    # Simple check for IP/CIDR pattern
+    # This can be improved with ipaddress module
+    return re.match(r'^[\d\.:/]+$', item) is not None
+
+  def _parse_complex_ports(self, port_str: str) -> Tuple[List[str], List[str]]:
+    """Parse string like '80/tcp (HTTP) 443/tcp (HTTPS)'."""
+    ports = set()
+    protocols = set()
+    
+    # Regex to match '80/tcp' or '443/udp' patterns
+    # We ignore the descriptions in parentheses
+    matches = re.finditer(r'(\d+)/([a-zA-Z]+)', port_str)
+    
+    for match in matches:
+      ports.add(match.group(1))
+      protocols.add(match.group(2).lower())
+      
+    # If no matches found, try simple split (backward compatibility)
+    if not ports:
+      parts = re.split(r'[,;\s]+', port_str)
+      for part in parts:
+        if part.isdigit():
+          ports.add(part)
+        elif part.lower() in ('tcp', 'udp', 'icmp'):
+          protocols.add(part.lower())
+          
+    return sorted(list(ports)), sorted(list(protocols))
+
   def _normalize_name(self, name: str) -> str:
     """Normalize rule name to be valid Capirca term name."""
     name = re.sub(r'[^a-zA-Z0-9_-]', '-', name)
@@ -256,27 +712,25 @@ class ConfluenceParser:
     name = name.strip('-')
     return name.lower()
   
+  # Backward compatibility methods if needed
+  def parse_table(self, html_content: str) -> List[FirewallRule]:
+    """Legacy method."""
+    return self.parse_html(html_content)
+
   def _parse_addresses(self, addr_str: str) -> List[str]:
-    """Parse comma or space separated addresses."""
-    if not addr_str:
-      return []
-    addresses = re.split(r'[,;\s]+', addr_str)
-    return [addr.strip() for addr in addresses if addr.strip()]
-  
+    """Legacy helper."""
+    return self._resolve_addresses(addr_str)
+
   def _parse_ports(self, port_str: str) -> List[str]:
-    """Parse comma or space separated ports."""
-    if not port_str:
-      return []
-    ports = re.split(r'[,;\s]+', port_str)
-    return [port.strip() for port in ports if port.strip()]
-  
+    """Legacy helper."""
+    ports, _ = self._parse_complex_ports(port_str)
+    return ports
+
   def _parse_protocols(self, proto_str: str) -> List[str]:
-    """Parse protocols from string."""
-    if not proto_str:
-      return []
-    protocols = re.split(r'[,;\s]+', proto_str.lower())
-    return [proto.strip() for proto in protocols if proto.strip()]
-  
+    """Legacy helper."""
+    _, protocols = self._parse_complex_ports(proto_str)
+    return protocols
+
   def _parse_action(self, action_str: str) -> str:
     """Parse and normalize action."""
     action = action_str.lower().strip()

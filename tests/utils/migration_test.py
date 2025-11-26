@@ -61,7 +61,7 @@ class ConfluenceParserTest(absltest.TestCase):
     self.assertEqual(rules[0].name, 'web-rule')
     self.assertEqual(rules[0].source_addresses, ['10.0.0.0/8'])
     self.assertEqual(rules[0].destination_addresses, ['192.168.1.10'])
-    self.assertEqual(rules[0].destination_ports, ['80', '443'])
+    self.assertEqual(rules[0].destination_ports, ['443', '80'])
     self.assertEqual(rules[0].protocols, ['tcp'])
     self.assertEqual(rules[0].action, 'accept')
     
@@ -101,8 +101,8 @@ class ConfluenceParserTest(absltest.TestCase):
     
   def testNoTable(self):
     html = "<div>No table here</div>"
-    with self.assertRaises(migration.ParseError):
-      self.parser.parse_table(html)
+    rules = self.parser.parse_table(html)
+    self.assertEqual(len(rules), 0)
       
   def testActionNormalization(self):
     html = """

@@ -1,0 +1,50 @@
+Confluence Page: UCAN Firewallregeln (ID: 118030376)\nURL: https://confluence.hrz.uni-bielefeld.de/pages/viewpage.action?pageId=118030376\n\nDependency Analysis Report
+==================================================
+
+Definitions (16):
+  - BETHEL-External-IPs (group)
+  - DBMGMT-WebApp-Servers (group)
+  - UCAN-Allowed-External (group)
+  - UCAN-Server-P (group)
+  - UCAN-Server-T (group)
+  - bethel-192.109.22.4 (host)
+  - bethel-217.239.221.94 (host)
+  - bitsmanaged-vms-dc-network (network)
+  - examinator-medfak.hrz.uni-bielefeld.de (host)
+  - examinator-test01.hrz.uni-bielefeld.de (host)
+  - ucan-p-exa01.hrz.uni-bielefeld.de (host)
+  - ucan-p-osc01.hrz.uni-bielefeld.de (host)
+  - ucan-p-tex01.hrz.uni-bielefeld.de (host)
+  - ucan-t-exa01.hrz.uni-bielefeld.de (host)
+  - ucan-t-osc01.hrz.uni-bielefeld.de (host)
+  - ucan-t-tex01.hrz.uni-bielefeld.de (host)
+
+References (12):
+  - BETHEL-External-IPs [OK]
+  - bethel-192.109.22.4 [OK]
+  - bethel-217.239.221.94 [OK]
+  - dbs-padm01.hrz.uni-bielefeld.de [UNRESOLVED]
+  - dbs-pbak01.hrz.uni-bielefeld.de [UNRESOLVED]
+  - dbsvc-hub-p01.hrz.uni-bielefeld.de [UNRESOLVED]
+  - ucan-p-exa01.hrz.uni-bielefeld.de [OK]
+  - ucan-p-osc01.hrz.uni-bielefeld.de [OK]
+  - ucan-p-tex01.hrz.uni-bielefeld.de [OK]
+  - ucan-t-exa01.hrz.uni-bielefeld.de [OK]
+  - ucan-t-osc01.hrz.uni-bielefeld.de [OK]
+  - ucan-t-tex01.hrz.uni-bielefeld.de [OK]
+
+Unresolved (3):
+  - dbs-padm01.hrz.uni-bielefeld.de
+  - dbs-pbak01.hrz.uni-bielefeld.de
+  - dbsvc-hub-p01.hrz.uni-bielefeld.de
+
+Dependency Chains:
+  - BETHEL-External-IPs: BETHEL-External-IPs → bethel-192.109.22.4 → bethel-217.239.221.94
+  - DBMGMT-WebApp-Servers: DBMGMT-WebApp-Servers → dbs-padm01.hrz.uni-bielefeld.de → dbs-pbak01.hrz.uni-bielefeld.de → dbsvc-hub-p01.hrz.uni-bielefeld.de
+  - UCAN-Allowed-External: UCAN-Allowed-External → BETHEL-External-IPs → bethel-192.109.22.4 → bethel-217.239.221.94
+  - UCAN-Server-P: UCAN-Server-P → ucan-p-exa01.hrz.uni-bielefeld.de → ucan-p-osc01.hrz.uni-bielefeld.de → ucan-p-tex01.hrz.uni-bielefeld.de
+  - UCAN-Server-T: UCAN-Server-T → ucan-t-exa01.hrz.uni-bielefeld.de → ucan-t-osc01.hrz.uni-bielefeld.de → ucan-t-tex01.hrz.uni-bielefeld.de
+
+Cycles: None
+
+Max Dependency Depth: 3

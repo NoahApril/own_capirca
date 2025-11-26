@@ -1,0 +1,582 @@
+#!/usr/bin/env python3
+"""Confluence Firewall Analyzer - Analyze firewall configurations across Confluence pages.
+
+This tool searches for Confluence pages with label 'dt=firewallregel', parses them,
+and generates comprehensive reports about hosts, networks, groups, and dependencies.
+
+Output:
+  - Individual page dependency reports
+  - Global overviews (hosts, networks, groups) in text and JSON
+  - Unresolved references report
+  - Statistics report
+"""
+
+import os
+import sys
+import json
+from typing import Dict, List, Set, Tuple
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from capirca.utils import migration
+from capirca.utils.confluence.confluence_http_service import ConfluenceService
+
+
+@dataclass
+class PageReference:
+    """Reference to a Confluence page."""
+    page_id: str
+    page_title: str
+    url: str
+
+
+@dataclass
+class HostInfo:
+    """Aggregated host information."""
+    fqdn: str
+    ip_address: str
+    source_pages: List[PageReference] = field(default_factory=list)
+    function: str = ""
+    comment: str = ""
+
+
+@dataclass
+class NetworkInfo:
+    """Aggregated network information."""
+    name: str
+    cidr: str
+    source_pages: List[PageReference] = field(default_factory=list)
+    function: str = ""
+    comment: str = ""
+
+
+@dataclass
+class GroupInfo:
+    """Aggregated group information."""
+    name: str
+    members: List[str]
+    source_pages: List[PageReference] = field(default_factory=list)
+    function: str = ""
+    comment: str = ""
+
+
+@dataclass
+class UnresolvedReference:
+    """Unresolved reference information."""
+    reference_name: str
+    referenced_by_pages: List[Tuple[PageReference, str]] = field(default_factory=list)  # (page, context)
+
+
+@dataclass
+class Statistics:
+    """Analysis statistics."""
+    pages_analyzed: int = 0
+    pages_failed: int = 0
+    total_hosts: int = 0
+    total_networks: int = 0
+    total_groups: int = 0
+    total_rules: int = 0
+    duplicate_hosts: int = 0
+    duplicate_networks: int = 0
+    duplicate_groups: int = 0
+    total_references: int = 0
+    resolved_references: int = 0
+    unresolved_references: int = 0
+    circular_dependencies: int = 0
+    max_dependency_depth: int = 0
+
+
+class ConfluenceFirewallAnalyzer:
+    """Analyze firewall configurations across multiple Confluence pages."""
+    
+    def __init__(self, confluence: ConfluenceService, base_url: str, output_dir: str = "output"):
+        """Initialize analyzer.
+        
+        Args:
+            confluence: ConfluenceService instance
+            base_url: Confluence base URL for generating links
+            output_dir: Output directory for reports
+        """
+        self.confluence = confluence
+        self.base_url = base_url
+        self.output_dir = output_dir
+        self.analyzer = migration.DependencyAnalyzer()
+        
+        # Aggregated data
+        self.all_hosts: Dict[str, HostInfo] = {}
+        self.all_networks: Dict[str, NetworkInfo] = {}
+        self.all_groups: Dict[str, GroupInfo] = {}
+        self.unresolved_refs: Dict[str, UnresolvedReference] = {}
+        self.page_reports: Dict[str, migration.DependencyReport] = {}
+        self.statistics = Statistics()
+        
+    def run(self, label: str = "dt=firewallregel"):
+        """Run complete analysis.
+        
+        Args:
+            label: Confluence label to search for
+        """
+        # Create timestamp-based output directory
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamped_output = os.path.join(self.output_dir, timestamp)
+        self.output_dir = timestamped_output
+        
+        print("=" * 70)
+        print("Confluence Firewall Analyzer")
+        print("=" * 70)
+        print(f"Label: {label}")
+        print(f"Output: {self.output_dir}")
+        print("-" * 70)
+        print()
+        
+        # Create output directories
+        self._create_output_dirs()
+        
+        # Step 1: Search for pages
+        print("Step 1: Searching for pages...")
+        pages = self._search_pages(label)
+        print(f"✓ Found {len(pages)} pages")
+        print()
+        
+        # Step 2: Process each page
+        print("Step 2: Processing pages...")
+        self._process_pages(pages)
+        print(f"✓ Processed {self.statistics.pages_analyzed} pages successfully")
+        if self.statistics.pages_failed > 0:
+            print(f"⚠  Failed to process {self.statistics.pages_failed} pages")
+        print()
+        
+        # Step 3: Generate reports
+        print("Step 3: Generating reports...")
+        self._generate_all_reports()
+        print("✓ All reports generated")
+        print()
+        
+        print("=" * 70)
+        print("Analysis Complete!")
+        print(f"Output directory: {os.path.abspath(self.output_dir)}")
+        print("=" * 70)
+        
+    def _create_output_dirs(self):
+        """Create output directory structure."""
+        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(os.path.join(self.output_dir, "page_reports"), exist_ok=True)
+        
+    def _search_pages(self, label: str) -> List[Dict]:
+        """Search for pages with given label.
+        
+        Args:
+            label: Confluence label
+            
+        Returns:
+            List of page metadata
+        """
+        cql = f"label = '{label}'"
+        results = []
+        start = 0
+        limit = 25
+        
+        while True:
+            try:
+                response = self.confluence.search_pages_by_cql(cql, start, limit)
+                if 'results' in response:
+                    results.extend(response['results'])
+                    
+                # Check if there are more results
+                if 'next' not in response.get('_links', {}):
+                    break
+                start += limit
+            except Exception as e:
+                print(f"Error searching pages: {e}")
+                break
+                
+        return results
+        
+    def _process_pages(self, pages: List[Dict]):
+        """Process all pages.
+        
+        Args:
+            pages: List of page metadata
+        """
+        for idx, page_meta in enumerate(pages, 1):
+            page_id = page_meta['id']
+            page_title = page_meta.get('title', 'Unknown')
+            
+            print(f"  [{idx}/{len(pages)}] Processing: {page_title} (ID: {page_id})")
+            
+            try:
+                self._process_single_page(page_id, page_title)
+                self.statistics.pages_analyzed += 1
+            except Exception as e:
+                print(f"      ✗ Error: {e}")
+                self.statistics.pages_failed += 1
+                
+    def _process_single_page(self, page_id: str, page_title: str):
+        """Process a single page.
+        
+        Args:
+            page_id: Page ID
+            page_title: Page title
+        """
+        # Fetch page
+        page_data = self.confluence.fetch_page_details(page_id)
+        if not page_data or 'body' not in page_data or 'view' not in page_data['body']:
+            raise ValueError("Could not fetch page content")
+            
+        # Parse HTML
+        html_content = page_data['body']['view']['value']
+        parser = migration.ConfluenceParser()
+        rules = parser.parse_html(html_content)
+        
+        # Analyze dependencies
+        report = self.analyzer.analyze(parser)
+        self.page_reports[page_id] = report
+        
+        # Create page reference
+        page_ref = PageReference(
+            page_id=page_id,
+            page_title=page_title,
+            url=f"{self.base_url}/pages/viewpage.action?pageId={page_id}"
+        )
+        
+        # Aggregate data
+        self._aggregate_hosts(parser, page_ref)
+        self._aggregate_networks(parser, page_ref)
+        self._aggregate_groups(parser, page_ref)
+        self._aggregate_unresolved(report, page_ref)
+        
+        # Update statistics
+        self.statistics.total_rules += len(rules)
+        self.statistics.max_dependency_depth = max(
+            self.statistics.max_dependency_depth,
+            report.max_depth
+        )
+        self.statistics.circular_dependencies += len(report.cycles)
+        
+    def _aggregate_hosts(self, parser: migration.ConfluenceParser, page_ref: PageReference):
+        """Aggregate host data.
+        
+        Args:
+            parser: ConfluenceParser instance
+            page_ref: Page reference
+        """
+        for fqdn, ip in parser.hosts.items():
+            if fqdn in self.all_hosts:
+                # Duplicate - add page reference
+                self.all_hosts[fqdn].source_pages.append(page_ref)
+                self.statistics.duplicate_hosts += 1
+            else:
+                self.all_hosts[fqdn] = HostInfo(
+                    fqdn=fqdn,
+                    ip_address=ip,
+                    source_pages=[page_ref]
+                )
+                
+        self.statistics.total_hosts = len(self.all_hosts)
+        
+    def _aggregate_networks(self, parser: migration.ConfluenceParser, page_ref: PageReference):
+        """Aggregate network data.
+        
+        Args:
+            parser: ConfluenceParser instance
+            page_ref: Page reference
+        """
+        for name, cidr in parser.networks.items():
+            if name in self.all_networks:
+                # Duplicate - add page reference
+                self.all_networks[name].source_pages.append(page_ref)
+                self.statistics.duplicate_networks += 1
+            else:
+                self.all_networks[name] = NetworkInfo(
+                    name=name,
+                    cidr=cidr,
+                    source_pages=[page_ref]
+                )
+                
+        self.statistics.total_networks = len(self.all_networks)
+        
+    def _aggregate_groups(self, parser: migration.ConfluenceParser, page_ref: PageReference):
+        """Aggregate group data.
+        
+        Args:
+            parser: ConfluenceParser instance
+            page_ref: Page reference
+        """
+        for name, members in parser.groups.items():
+            if name in self.all_groups:
+                # Duplicate - add page reference
+                self.all_groups[name].source_pages.append(page_ref)
+                self.statistics.duplicate_groups += 1
+            else:
+                self.all_groups[name] = GroupInfo(
+                    name=name,
+                    members=members,
+                    source_pages=[page_ref]
+                )
+                
+        self.statistics.total_groups = len(self.all_groups)
+        
+    def _aggregate_unresolved(self, report: migration.DependencyReport, page_ref: PageReference):
+        """Aggregate unresolved references.
+        
+        Args:
+            report: DependencyReport
+            page_ref: Page reference
+        """
+        for ref in report.unresolved:
+            if ref not in self.unresolved_refs:
+                self.unresolved_refs[ref] = UnresolvedReference(reference_name=ref)
+                
+            # Find which group references this
+            context = "Unknown context"
+            for group_name, chain in report.dependency_chains.items():
+                if ref in chain:
+                    context = f"In Group: {group_name}"
+                    break
+                    
+            self.unresolved_refs[ref].referenced_by_pages.append((page_ref, context))
+            
+        # Update statistics
+        self.statistics.total_references = len(report.references)
+        self.statistics.resolved_references = len(report.references) - len(report.unresolved)
+        self.statistics.unresolved_references = len(self.unresolved_refs)
+        
+    def _generate_all_reports(self):
+        """Generate all reports."""
+        self._generate_page_reports()
+        self._generate_hosts_overview()
+        self._generate_networks_overview()
+        self._generate_groups_overview()
+        self._generate_unresolved_report()
+        self._generate_statistics_report()
+        
+    def _generate_page_reports(self):
+        """Generate individual page dependency reports."""
+        for page_id, report in self.page_reports.items():
+            # Find page title
+            page_title = "Unknown"
+            for ref in (list(self.all_hosts.values()) + 
+                       list(self.all_networks.values()) + 
+                       list(self.all_groups.values())):
+                for page_ref in ref.source_pages:
+                    if page_ref.page_id == page_id:
+                        page_title = page_ref.page_title
+                        break
+                        
+            # Sanitize filename
+            safe_title = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' 
+                               for c in page_title)
+            filename = f"page_{page_id}_{safe_title}.txt"
+            filepath = os.path.join(self.output_dir, "page_reports", filename)
+            
+            with open(filepath, 'w') as f:
+                f.write(f"Confluence Page: {page_title} (ID: {page_id})\n")
+                f.write(f"URL: {self.base_url}/pages/viewpage.action?pageId={page_id}\n\n")
+                f.write(report.format_report())
+                
+    def _generate_hosts_overview(self):
+        """Generate hosts overview in text and JSON."""
+        # Text format
+        filepath_txt = os.path.join(self.output_dir, "hosts_overview.txt")
+        with open(filepath_txt, 'w') as f:
+            f.write(f"Hosts Overview (Total: {len(self.all_hosts)})\n")
+            f.write("=" * 70 + "\n\n")
+            
+            for fqdn in sorted(self.all_hosts.keys()):
+                host = self.all_hosts[fqdn]
+                f.write(f"{fqdn}\n")
+                f.write(f"  IP: {host.ip_address}\n")
+                f.write(f"  Defined in:\n")
+                for page_ref in host.source_pages:
+                    f.write(f"    - Page: {page_ref.page_title} (ID: {page_ref.page_id})\n")
+                    f.write(f"      URL: {page_ref.url}\n")
+                f.write("\n")
+                
+        # JSON format
+        filepath_json = os.path.join(self.output_dir, "hosts_overview.json")
+        hosts_dict = {}
+        for fqdn, host in self.all_hosts.items():
+            hosts_dict[fqdn] = {
+                "ip_address": host.ip_address,
+                "source_pages": [
+                    {
+                        "page_id": ref.page_id,
+                        "page_title": ref.page_title,
+                        "url": ref.url
+                    }
+                    for ref in host.source_pages
+                ]
+            }
+            
+        with open(filepath_json, 'w') as f:
+            json.dump(hosts_dict, f, indent=2)
+            
+    def _generate_networks_overview(self):
+        """Generate networks overview in text and JSON."""
+        # Text format
+        filepath_txt = os.path.join(self.output_dir, "networks_overview.txt")
+        with open(filepath_txt, 'w') as f:
+            f.write(f"Networks Overview (Total: {len(self.all_networks)})\n")
+            f.write("=" * 70 + "\n\n")
+            
+            for name in sorted(self.all_networks.keys()):
+                network = self.all_networks[name]
+                f.write(f"{name}\n")
+                f.write(f"  CIDR: {network.cidr}\n")
+                f.write(f"  Defined in:\n")
+                for page_ref in network.source_pages:
+                    f.write(f"    - Page: {page_ref.page_title} (ID: {page_ref.page_id})\n")
+                    f.write(f"      URL: {page_ref.url}\n")
+                f.write("\n")
+                
+        # JSON format
+        filepath_json = os.path.join(self.output_dir, "networks_overview.json")
+        networks_dict = {}
+        for name, network in self.all_networks.items():
+            networks_dict[name] = {
+                "cidr": network.cidr,
+                "source_pages": [
+                    {
+                        "page_id": ref.page_id,
+                        "page_title": ref.page_title,
+                        "url": ref.url
+                    }
+                    for ref in network.source_pages
+                ]
+            }
+            
+        with open(filepath_json, 'w') as f:
+            json.dump(networks_dict, f, indent=2)
+            
+    def _generate_groups_overview(self):
+        """Generate groups overview in text and JSON."""
+        # Text format
+        filepath_txt = os.path.join(self.output_dir, "groups_overview.txt")
+        with open(filepath_txt, 'w') as f:
+            f.write(f"Groups Overview (Total: {len(self.all_groups)})\n")
+            f.write("=" * 70 + "\n\n")
+            
+            for name in sorted(self.all_groups.keys()):
+                group = self.all_groups[name]
+                f.write(f"{name}\n")
+                f.write(f"  Members: {', '.join(group.members)}\n")
+                f.write(f"  Defined in:\n")
+                for page_ref in group.source_pages:
+                    f.write(f"    - Page: {page_ref.page_title} (ID: {page_ref.page_id})\n")
+                    f.write(f"      URL: {page_ref.url}\n")
+                f.write("\n")
+                
+        # JSON format
+        filepath_json = os.path.join(self.output_dir, "groups_overview.json")
+        groups_dict = {}
+        for name, group in self.all_groups.items():
+            groups_dict[name] = {
+                "members": group.members,
+                "source_pages": [
+                    {
+                        "page_id": ref.page_id,
+                        "page_title": ref.page_title,
+                        "url": ref.url
+                    }
+                    for ref in group.source_pages
+                ]
+            }
+            
+        with open(filepath_json, 'w') as f:
+            json.dump(groups_dict, f, indent=2)
+            
+    def _generate_unresolved_report(self):
+        """Generate unresolved references report."""
+        filepath = os.path.join(self.output_dir, "unresolved_references.txt")
+        with open(filepath, 'w') as f:
+            f.write(f"Unresolved References (Total: {len(self.unresolved_refs)})\n")
+            f.write("=" * 70 + "\n\n")
+            
+            for ref_name in sorted(self.unresolved_refs.keys()):
+                unresolved = self.unresolved_refs[ref_name]
+                f.write(f"{ref_name}\n")
+                f.write(f"  Referenced by:\n")
+                for page_ref, context in unresolved.referenced_by_pages:
+                    f.write(f"    - Page: {page_ref.page_title} (ID: {page_ref.page_id})\n")
+                    f.write(f"      URL: {page_ref.url}\n")
+                    f.write(f"      {context}\n")
+                f.write("\n")
+                
+    def _generate_statistics_report(self):
+        """Generate statistics report."""
+        filepath = os.path.join(self.output_dir, "statistics_report.txt")
+        with open(filepath, 'w') as f:
+            f.write("Statistics Report\n")
+            f.write("=" * 70 + "\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            
+            f.write(f"Pages Analyzed: {self.statistics.pages_analyzed}\n")
+            if self.statistics.pages_failed > 0:
+                f.write(f"Pages Failed: {self.statistics.pages_failed}\n")
+            f.write("\n")
+            
+            f.write("Total Definitions:\n")
+            f.write(f"  - Hosts: {self.statistics.total_hosts}\n")
+            f.write(f"  - Networks: {self.statistics.total_networks}\n")
+            f.write(f"  - Groups: {self.statistics.total_groups}\n")
+            f.write(f"  - Firewall Rules: {self.statistics.total_rules}\n")
+            f.write("\n")
+            
+            if (self.statistics.duplicate_hosts > 0 or 
+                self.statistics.duplicate_networks > 0 or 
+                self.statistics.duplicate_groups > 0):
+                f.write("Duplicates:\n")
+                f.write(f"  - Hosts defined in multiple pages: {self.statistics.duplicate_hosts}\n")
+                f.write(f"  - Networks defined in multiple pages: {self.statistics.duplicate_networks}\n")
+                f.write(f"  - Groups defined in multiple pages: {self.statistics.duplicate_groups}\n")
+                f.write("\n")
+                
+            f.write("Dependency Analysis:\n")
+            f.write(f"  - Total References: {self.statistics.total_references}\n")
+            f.write(f"  - Resolved: {self.statistics.resolved_references} ")
+            if self.statistics.total_references > 0:
+                pct = (self.statistics.resolved_references / self.statistics.total_references) * 100
+                f.write(f"({pct:.1f}%)")
+            f.write("\n")
+            f.write(f"  - Unresolved: {self.statistics.unresolved_references} ")
+            if self.statistics.total_references > 0:
+                pct = (self.statistics.unresolved_references / self.statistics.total_references) * 100
+                f.write(f"({pct:.1f}%)")
+            f.write("\n")
+            f.write(f"  - Circular Dependencies: {self.statistics.circular_dependencies}\n")
+            f.write("\n")
+            
+            f.write(f"Max Dependency Depth: {self.statistics.max_dependency_depth}\n")
+
+
+def main():
+    """Main entry point."""
+    # Load environment variables
+    load_dotenv()
+    
+    base_url = os.getenv('CONFLUENCE_URL')
+    api_token = os.getenv('CONFLUENCE_API_TOKEN')
+    username = os.getenv('CONFLUENCE_USERNAME')
+    
+    if not all([base_url, api_token, username]):
+        print("Error: Missing environment variables!")
+        print("Please create a .env file with:")
+        print("  CONFLUENCE_URL=https://your-confluence-instance.com")
+        print("  CONFLUENCE_API_TOKEN=your_api_token")
+        print("  CONFLUENCE_USERNAME=your_email@example.com")
+        sys.exit(1)
+        
+    # Initialize Confluence service
+    confluence = ConfluenceService(base_url, username, api_token)
+    
+    # Run analyzer
+    analyzer = ConfluenceFirewallAnalyzer(confluence, base_url)
+    analyzer.run()
+
+
+if __name__ == '__main__':
+    main()
