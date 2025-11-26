@@ -150,8 +150,14 @@ class ConfluenceFirewallAnalyzer:
             print(f"⚠  Failed to process {self.statistics.pages_failed} pages")
         print()
         
-        # Step 3: Generate reports
-        print("Step 3: Generating reports...")
+        # Step 3: Global Resolution
+        print("Step 3: Resolving references globally...")
+        self._resolve_global_references()
+        print(f"✓ Global resolution complete")
+        print()
+        
+        # Step 4: Generate reports
+        print("Step 4: Generating reports...")
         self._generate_all_reports()
         print("✓ All reports generated")
         print()
@@ -340,11 +346,37 @@ class ConfluenceFirewallAnalyzer:
                     
             self.unresolved_refs[ref].referenced_by_pages.append((page_ref, context))
             
-        # Update statistics
-        self.statistics.total_references = len(report.references)
-        self.statistics.resolved_references = len(report.references) - len(report.unresolved)
-        self.statistics.unresolved_references = len(self.unresolved_refs)
+        # Update statistics (initial local count)
+        self.statistics.total_references += len(report.references)
+        # resolved_references and unresolved_references will be recalculated globally
         
+    def _resolve_global_references(self):
+        """Resolve references against global definitions."""
+        resolved_count = 0
+        refs_to_remove = []
+        
+        for ref_name in self.unresolved_refs:
+            # Check if defined anywhere
+            is_defined = (
+                ref_name in self.all_hosts or
+                ref_name in self.all_networks or
+                ref_name in self.all_groups
+            )
+            
+            if is_defined:
+                refs_to_remove.append(ref_name)
+                resolved_count += 1
+                
+        # Remove resolved references
+        for ref_name in refs_to_remove:
+            del self.unresolved_refs[ref_name]
+            
+        print(f"  ✓ Resolved {resolved_count} references using global definitions")
+        
+        # Update statistics
+        self.statistics.unresolved_references = len(self.unresolved_refs)
+        self.statistics.resolved_references = self.statistics.total_references - self.statistics.unresolved_references
+
     def _generate_all_reports(self):
         """Generate all reports."""
         self._generate_page_reports()
