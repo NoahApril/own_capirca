@@ -17,7 +17,8 @@ from capirca.api.models.schemas import (
     ValidationResult,
 )
 from capirca.api.services.validator import PolicyValidator
-from capirca.lib import naming
+from capirca.lib import naming, policy
+from capirca.api.services.graph import GraphService
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -138,3 +139,38 @@ def validate_policy(
     db.commit()
     
     return result
+
+
+@router.get("/{policy_id}/graph")
+def get_policy_graph(
+    policy_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get the graph representation of a policy."""
+    db_policy = db.query(models.Policy).filter(models.Policy.id == policy_id).first()
+    if db_policy is None:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    
+    try:
+        # Load definitions if available
+        try:
+            definitions = naming.Naming('./def')
+        except Exception:
+            definitions = None
+            
+        # Parse the policy
+        parsed_policy = policy.ParsePolicy(
+            db_policy.content,
+            definitions=definitions,
+            optimize=False,
+            shade_check=False
+        )
+        
+        # Convert to graph
+        graph_service = GraphService()
+        graph_data = graph_service.policy_to_graph(parsed_policy)
+        
+        return graph_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate graph: {str(e)}")
