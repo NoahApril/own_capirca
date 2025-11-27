@@ -25,10 +25,15 @@ const GroupNode = ({ data, selected }) => {
 
     return (
         <div
-            className={`shadow-md rounded-lg bg-white border-4 border-dashed min-w-[200px] transition-all ${selected ? 'border-purple-500' : 'border-purple-300'
-                }`}
+            className="shadow-md rounded-lg bg-white min-w-[200px] transition-all"
+            style={{
+                borderWidth: '2px',
+                borderStyle: 'solid',
+                borderColor: selected ? '#a855f7' : '#d8b4fe',
+                boxSizing: 'border-box',
+            }}
         >
-            <div className="px-4 py-2.5 flex items-center justify-between">
+            <div className="flex items-center justify-between px-4 py-2.5">
                 <div className="flex items-center">
                     <div className="rounded-full w-8 h-8 flex items-center justify-center bg-purple-100 text-purple-600">
                         <Layers size={16} />
@@ -102,3 +107,4 @@ const GroupNode = ({ data, selected }) => {
 };
 
 export default GroupNode;
+

@@ -22,7 +22,8 @@ import DeleteConfirmDialog from './components/ui/DeleteConfirmDialog';
 const nodeTypes = {
     host: HostNode,
     network: NetworkNode,
-    group: GroupNode,
+    net_group: GroupNode,
+
 };
 
 function FlowContent({ policyId = 1 }) {

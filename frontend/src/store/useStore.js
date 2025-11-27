@@ -5,8 +5,29 @@ import {
     applyEdgeChanges,
 } from '@xyflow/react';
 
+const initialNodes = [
+    {
+        id: 'host-1',
+        type: 'host',
+        position: { x: 50, y: 100 },
+        data: { label: 'Test Host', fqdn: '192.168.1.1' },
+    },
+    {
+        id: 'network-1',
+        type: 'network',
+        position: { x: 250, y: 100 },
+        data: { label: 'Test Network', cidr: '10.0.0.0/24' },
+    },
+    {
+        id: 'group-1',
+        type: 'net_group',
+        position: { x: 450, y: 100 },
+        data: { label: 'Test Group', members: [] },
+    },
+];
+
 const useStore = create((set, get) => ({
-    nodes: [],
+    nodes: initialNodes,
     edges: [],
     selectedId: null,
 

@@ -40,7 +40,7 @@ const PropertiesPanel = () => {
                     description: selectedObject.description
                 });
             }
-        } else if (selectedNode.type === 'group') {
+        } else if (selectedNode.type === 'net_group') {
             selectedObject = mockGroups.find(g => g.id === objectId);
             if (selectedObject) {
                 updateNode(selectedId, {
@@ -76,7 +76,7 @@ const PropertiesPanel = () => {
                                 {selectedNode.type === 'network' && mockNetworks.map(n => (
                                     <option key={n.id} value={n.id}>{n.name} ({n.cidr})</option>
                                 ))}
-                                {selectedNode.type === 'group' && mockGroups.map(g => (
+                                {selectedNode.type === 'net_group' && mockGroups.map(g => (
                                     <option key={g.id} value={g.id}>{g.name}</option>
                                 ))}
                             </select>
@@ -113,6 +113,18 @@ const PropertiesPanel = () => {
                                         type="text"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
                                         value={selectedNode.data.cidr || ''}
+                                        readOnly
+                                    />
+                                </div>
+                            )}
+
+                            {(selectedNode.type === 'net_group') && (
+                                <div className="mt-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Members</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+                                        value={selectedNode.data.count || 0}
                                         readOnly
                                     />
                                 </div>

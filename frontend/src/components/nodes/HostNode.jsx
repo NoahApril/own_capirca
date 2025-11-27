@@ -4,8 +4,13 @@ import { Server } from 'lucide-react';
 const HostNode = ({ data, selected }) => {
     return (
         <div
-            className={`px-4 py-2.5 shadow-md rounded-lg bg-white border-2 min-w-[150px] ${selected ? 'border-blue-500' : 'border-gray-200'
-                }`}
+            className="px-4 py-2.5 shadow-md rounded-lg bg-white min-w-[150px] transition-all"
+            style={{
+                borderWidth: '2px',
+                borderStyle: 'solid',
+                borderColor: selected ? '#3b82f6' : '#bfdbfe',
+                boxSizing: 'border-box'
+            }}
         >
             <div className="flex items-center">
                 <div className="rounded-full w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-600">
@@ -24,11 +29,13 @@ const HostNode = ({ data, selected }) => {
             <Handle
                 type="target"
                 position={Position.Left}
+                style={{ top: '50%' }}
                 className="w-3 h-3 !bg-blue-400"
             />
             <Handle
                 type="source"
                 position={Position.Right}
+                style={{ top: '50%' }}
                 className="w-3 h-3 !bg-blue-400"
             />
         </div>

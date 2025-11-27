@@ -44,7 +44,7 @@ const Sidebar = () => {
 
                 <div
                     className="flex items-center p-3 bg-white border border-gray-200 rounded-md cursor-grab hover:border-purple-500 hover:shadow-sm transition-all"
-                    onDragStart={(event) => onDragStart(event, 'group')}
+                    onDragStart={(event) => onDragStart(event, 'net_group')}
                     draggable
                 >
                     <div className="p-2 bg-purple-100 rounded-md text-purple-600 mr-3">

@@ -33,8 +33,13 @@ const NetworkNode = ({ data, selected }) => {
 
     return (
         <div
-            className={`shadow-md rounded-lg bg-white border-4 border-double min-w-[150px] transition-all ${selected ? 'border-green-500' : 'border-green-300'
-                }`}
+            className="shadow-md rounded-lg bg-white min-w-[150px] transition-all"
+            style={{
+                borderWidth: '2px',
+                borderStyle: 'solid',
+                borderColor: selected ? '#22c55e' : '#bbf7d0',
+                boxSizing: 'border-box'
+            }}
         >
             <div className="flex items-center justify-between px-4 py-2.5">
                 <div className="flex items-center">
@@ -88,11 +93,13 @@ const NetworkNode = ({ data, selected }) => {
             <Handle
                 type="target"
                 position={Position.Left}
+                style={{ top: '50%' }}
                 className="w-3 h-3 !bg-green-400"
             />
             <Handle
                 type="source"
                 position={Position.Right}
+                style={{ top: '50%' }}
                 className="w-3 h-3 !bg-green-400"
             />
         </div>
