@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_prefix = "CAPIRCA_"
-        env_file = ".env"
+        env_file = ".env_capirca"
         case_sensitive = False
 
 
