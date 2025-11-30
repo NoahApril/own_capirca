@@ -729,106 +729,132 @@ GET    /api/dashboard/service-health   → Service Health Overview
 
 ## Implementierungsphasen (aktualisiert)
 
-### Phase 1: Setup & Service-Grundstruktur (3-4 Tage)
+### Phase 1: Setup & Service-Grundstruktur ✅ ABGESCHLOSSEN
+
+**Status:** ✅ Fertiggestellt am 2024-11-29
 
 **Tasks:**
-- [ ] Projekt-Setup mit Service-orientierter Architektur
-  - Vite + React + TypeScript
-  - Routing mit Service-Hierarchie
-  - State Management (Zustand + React Query)
-  - Tailwind CSS
+- [x] Projekt-Setup mit Service-orientierter Architektur
+  - [x] Vite + React + TypeScript konfiguriert
+  - [x] React Router v6 mit Service-Hierarchie
+  - [x] Zustand für UI State (theme, sidebar)
+  - [x] TanStack Query für Server State
+  - [x] Tailwind CSS nach Design-System konfiguriert
   
-- [ ] Layout-Komponenten
-  - Header mit ServiceSwitcher
-  - Sidebar mit Service-Navigation
-  - Breadcrumb-Komponente
-  - MainContent Wrapper
+- [x] Layout-Komponenten
+  - [x] Header mit Search, Theme Toggle, User Menu
+  - [x] Sidebar mit Navigation (Dashboard, Services, Global Views)
+  - [x] Breadcrumb-Komponente (in ServiceDetailView integriert)
+  - [x] AppLayout Wrapper mit Outlet
 
-- [ ] Design System Grundlagen
-  - ServiceBadge-Komponente
-  - StatusIndicator-Komponente
-  - Standard UI Components
+- [x] Design System Grundlagen
+  - [x] ServiceBadge-Komponente mit Status-Colors
+  - [x] StatusIndicator-Komponente (healthy/warning/critical)
+  - [x] StatsCard Komponente mit Trend-Indikatoren
+  - [x] Dark Mode Glassmorphism Design (slate-900, indigo/blue gradients)
 
-- [ ] Mock API (Service-orientiert)
-  - Mock-Daten für 10-15 Services (ATREMOTE, AD, MOODLE, etc.)
-  - Hierarchische Daten (Service → Hosts/Networks/Groups/Policies)
+- [x] Mock API (Service-orientiert)
+  - [x] Mock-Daten für 10 Services (ATREMOTE, AD, MOODLE, SAP, VMW, DMS, EXCHANGE, WEB, DB, BACKUP)
+  - [x] Hierarchische Daten: Services → Hosts (16) / Networks (7) / Groups (5) / Policies (10)
+  - [x] Dashboard Stats und Activity Items
+  - [x] mockApi.ts mit async fetch-Funktionen
+  - [x] Custom Hooks (useServices, useDashboardData, useServiceById, etc.)
 
 **Deliverables:**
-- Service-orientierte Navigation funktioniert
-- Mock API mit hierarchischen Daten
+- ✅ Service-orientierte Navigation funktioniert perfekt
+- ✅ Mock API mit vollständigen hierarchischen Daten
+- ✅ Routing Setup: `/`, `/services`, `/services/:id`, `/services/:id/:tab`
+- ✅ Basis Layout mit Dark Mode Design System
 
-### Phase 2: Dashboard & Services Overview (3-4 Tage)
+### Phase 2: Dashboard & Services Overview ✅ ABGESCHLOSSEN
+
+**Status:** ✅ Fertiggestellt am 2024-11-29
 
 **Tasks:**
-- [ ] Dashboard
-  - Service-Health-Overview
-  - StatsCards mit Service-Count
-  - TopServicesChart
-  - ExpirationAlerts by Service
+- [x] Dashboard
+  - [x] Service-Health-Overview inkl. Health List + Status Badges
+  - [x] StatsCards mit Trend-Anzeige (Hosts, Networks, Groups, Policies)
+  - [x] TopServicesChart (Ranking & Progress Bars)
+  - [x] ExpirationAlerts (72h-Timer, Timer Icon)
+  - [x] Recent Activity Timeline (8 letzte Events)
 
-- [ ] Services Overview
-  - Service Grid View
-  - Service List View
-  - Service Cards mit Stats
-  - Search & Filter
+- [x] Services Overview
+  - [x] Service Grid View (Glass Cards mit Gradients)
+  - [x] Service List View (Tabellenmodus)
+  - [x] Service Cards mit Stats & Expiration Badges
+  - [x] Search + View Toggle (Grid/List)
 
-- [ ] API Integration
-  - `/api/services`
-  - `/api/dashboard/stats`
-  - `/api/dashboard/service-health`
+- [x] API Integration (Mock via TanStack Query)
+  - [x] `useServices()` → `/api/services`
+  - [x] `useDashboardStats()` → `/api/dashboard/stats`
+  - [x] `useServiceHealth()` → `/api/dashboard/service-health`
+  - [x] `useExpiringPolicies()` → `/api/dashboard/expiring`
+  - [x] `useRecentActivity()` → `/api/dashboard/activity`
 
 **Deliverables:**
-- Funktionierendes Dashboard
-- Services Overview mit Grid/List View
+- ✅ Dashboard mit allen Widgets laut Design-Vorgabe
+- ✅ Services Overview mit Grid/List View, Search & Status KPIs
+- ✅ Consistent Dark Mode Styling und Glassmorphism Cards
 
-### Phase 3: Service Detail View - Overview & Navigation (3-4 Tage)
+### Phase 3: Service Detail View - Overview & Navigation ⏳ TEILWEISE FERTIG
+
+**Status:** 🔄 In Entwicklung - Basis implementiert, Topology View steht noch aus
 
 **Tasks:**
-- [ ] Service Detail Layout
-  - ServiceHeader
-  - ServiceStatsBar
-  - TabView-Komponente
+- [x] Service Detail Layout
+  - [x] ServiceHeader mit Badge, Status, Name & Actions
+  - [x] ServiceStatsBar (4 Cards: Hosts/Networks/Groups/Policies)
+  - [x] TabView-Komponente mit 5 Tabs
 
-- [ ] Overview Tab
-  - Service Information Card
-  - Topology View (React Flow) - Basic
-  - QuickActions Panel
-  - Expiration Warnings
+- [~] Overview Tab
+  - [x] Service Information Card (Owner, Firewall, Dates)
+  - [ ] Topology View (React Flow) - **AUSSTEHEND für Phase 7**
+  - [ ] QuickActions Panel - **AUSSTEHEND**
+  - [ ] Expiration Warnings - **AUSSTEHEND**
 
-- [ ] Navigation & Breadcrumbs
-  - Service-Context Management
-  - Tab-Switching
-  - URL-basierte Navigation
+- [x] Navigation & Breadcrumbs
+  - [x] Service-Context Management (via useParams)
+  - [x] Tab-Switching (URL + State Sync)
+  - [x] URL-basierte Navigation (`/services/:id`, `/services/:id/:tab`)
+  - [x] Breadcrumb: Services → {ShortName}
 
 **Deliverables:**
-- Service Detail View mit Overview Tab
-- Context-aware Navigation
+- ✅ Service Detail View mit Overview Tab (Info Card)
+- ✅ Context-aware Navigation und Breadcrumb
+- ⏳ Topology View → Phase 7 (React Flow Integration)
 
-### Phase 4: Service-Specific Entity Views (5-6 Tage)
+### Phase 4: Service-Specific Entity Views ⏳ TEILWEISE FERTIG
+
+**Status:** 🔄 Tabellen-Ansichten implementiert, CRUD Forms fehlen noch
 
 **Tasks:**
-- [ ] Hosts Tab (service-spezifisch)
-  - ServiceHostsTable
-  - Add/Create Host Forms
-  - Service-Filter
+- [~] Hosts Tab (service-spezifisch)
+  - [x] ServiceHostsTable mit vollständigen Daten (Name, IP, Type, Comment, Usage)
+  - [ ] Add/Create Host Forms - **AUSSTEHEND**
+  - [x] Service-Filter via `useServiceHosts(serviceId)`
 
-- [ ] Networks Tab (service-spezifisch)
-  - ServiceNetworksTable
-  - Add/Create Network Forms
+- [~] Networks Tab (service-spezifisch)
+  - [x] ServiceNetworksTable (Name, CIDR, Comment, Usage)
+  - [ ] Add/Create Network Forms - **AUSSTEHEND**
 
-- [ ] Groups Tab (service-spezifisch)
-  - ServiceGroupsTable
-  - Members Management (service-aware)
+- [~] Groups Tab (service-spezifisch)
+  - [x] ServiceGroupsTable (Name, Type, Members Count, Comment)
+  - [ ] Members Management (service-aware) - **AUSSTEHEND**
 
-- [ ] API Integration
-  - `/api/services/:serviceId/hosts`
-  - `/api/services/:serviceId/networks`
-  - `/api/services/:serviceId/groups`
-  - CRUD-Operationen
+- [~] Policies Tab (service-spezifisch)
+  - [x] ServicePoliciesTable (Source, Dest, Services, Action, Expires)
+  - [ ] Create/Edit Policy Forms - **AUSSTEHEND (Phase 5)**
+
+- [x] API Integration (Mock via TanStack Query)
+  - [x] `useServiceHosts(serviceId)` → mockApi.fetchServiceHosts
+  - [x] `useServiceNetworks(serviceId)` → mockApi.fetchServiceNetworks
+  - [x] `useServiceGroups(serviceId)` → mockApi.fetchServiceGroups
+  - [x] `useServicePolicies(serviceId)` → mockApi.fetchServicePolicies
+  - [ ] CRUD-Operationen - **AUSSTEHEND**
 
 **Deliverables:**
-- Alle service-spezifischen Entity Tabs funktional
-- CRUD für Hosts/Networks/Groups innerhalb eines Services
+- ✅ Alle service-spezifischen Entity Tabs READ-Only implementiert
+- ⏳ CRUD für Hosts/Networks/Groups → nächster Entwicklungsschritt
 
 ### Phase 5: Service-Specific Policies View (4-5 Tage)
 
@@ -1081,13 +1107,48 @@ frontend/
 ## Nächste Schritte
 
 1. ✅ **Service-Konzept validiert** ← FERTIG
-2. ⏳ **Backend-API mit Service-Support spezifizieren**
-3. ⏳ **Mock-Daten mit Service-Hierarchie erstellen**
-4. ⏳ **Implementierung starten (Phase 1)**
+2. ✅ **Mock-Daten mit Service-Hierarchie erstellen** ← FERTIG
+3. ✅ **Implementierung starten (Phase 1 & 2)** ← FERTIG
+4. ✅ **Service Detail Views & Entity Tabs (Phase 3 & 4 - Basis)** ← FERTIG
+5. ⏳ **CRUD Forms für Entities** ← NÄCHSTER SCHRITT
+6. ⏳ **Policy Management CRUD (Phase 5)**
+7. ⏳ **Global Views (Phase 6)**
+8. ⏳ **Topology Visualisierung mit React Flow (Phase 7)**
+9. ⏳ **Backend-API mit Service-Support implementieren**
+
+---
+
+## Aktuelle Umsetzung - Stand 2024-11-29
+
+### Was wurde implementiert:
+
+**Phase 1 & 2 (100% fertig):**
+- ✅ Vollständiges Setup mit Vite + React + TypeScript
+- ✅ Dark Mode Design System (Glassmorphism, Slate/Indigo Palette)
+- ✅ React Router v6 mit service-orientierter Hierarchie
+- ✅ TanStack Query + Zustand State Management
+- ✅ Layout (AppLayout, Header, Sidebar)
+- ✅ Dashboard mit allen Widgets (Stats, Health, Charts, Activity, Expiration)
+- ✅ Services Overview (Grid/List View, Search, Filter)
+- ✅ Umfangreiche Mockdaten (10 Services, 16 Hosts, 7 Networks, 5 Groups, 10 Policies)
+
+**Phase 3 & 4 (Read-Only Basis, ca. 70% fertig):**
+- ✅ Service Detail View mit Header, Stats, Breadcrumb
+- ✅ Tab Navigation (Overview, Hosts, Networks, Groups, Policies)
+- ✅ Alle Entity-Tabellen mit vollständigen Daten
+- ⏳ CRUD Forms fehlen noch
+- ⏳ React Flow Topology View → Phase 7
+
+### Was folgt als Nächstes:
+
+**Priorität 1:** CRUD Forms implementieren (Add/Edit Host, Network, Group)
+**Priorität 2:** Policy Management (Create/Edit Multi-Step Form)
+**Priorität 3:** Global Views (All Hosts, Networks, Groups, Policies)
+**Priorität 4:** React Flow Topology Integration
 
 ---
 
 **Erstellt von**: Antigravity AI Assistant  
 **Datum**: 2025-11-29  
-**Version**: 2.0 (Service-Oriented)  
+**Version**: 2.1 (Implementation Progress Update)  
 **Projekt**: Capirca Firewall Management
